@@ -1,0 +1,30 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local environment (jangan commit!)
+.env.local
+.env
+
+# Dependencies (jika add npm nanti)
+node_modules/
+package-lock.json
+
+# Secrets (jangan pernah commit token!)
+tokens/
+secrets/
+
+# Temporary files
+*.tmp
+.cache/

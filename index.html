@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>💰 Budget Tracker Chat</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>💰 Budget Tracker</h1>
+        <p>Catat pengeluaran dengan chat</p>
+      </div>
+
+      <!-- Chat Box -->
+      <div class="chat-box" id="chatBox">
+        <div class="message ai">
+          <div class="bubble">
+            Halo! 👋 Saya siap membantu catat transaksi Anda. Cukup ketik
+            seperti:
+            <br />
+            • "beli makan 50rb"
+            <br />
+            • "gajian 5 juta"
+            <br />
+            • "bayar listrik 200rb"
+            <br />
+            <br />
+            Atau ketik "<strong>#recap</strong>" untuk lihat ringkasan.
+          </div>
+          <span class="time">Sekarang</span>
+        </div>
+      </div>
+
+      <!-- Summary Box -->
+      <div class="summary-box" id="summaryBox" style="display: none">
+        <h3>📊 Ringkasan Bulan Ini</h3>
+        <div class="summary-grid">
+          <div>
+            <span>Pemasukan</span>
+            <strong class="income" id="totalIncome">Rp0</strong>
+          </div>
+          <div>
+            <span>Pengeluaran</span>
+            <strong class="expense" id="totalExpense">Rp0</strong>
+          </div>
+          <div>
+            <span>Saldo</span>
+            <strong id="totalBalance">Rp0</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Form -->
+      <form class="input-form" id="inputForm">
+        <input
+          type="text"
+          id="messageInput"
+          placeholder="Ketik pesan atau #recap..."
+          autocomplete="off"
+        />
+        <button type="submit" id="sendBtn">➤</button>
+      </form>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
