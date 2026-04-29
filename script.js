@@ -27,10 +27,11 @@ inputForm.addEventListener('submit', async (e) => {
   // Disable input while processing
   messageInput.disabled = true;
   sendBtn.disabled = true;
+  let loadingMessage = null;
 
   try {
     // Show loading indicator
-    addMessage('Sedang memproses...', 'ai', true);
+    loadingMessage = addMessage('Sedang memproses...', 'ai', true);
 
     // Call Google Apps Script
     const response = await fetch(APPS_SCRIPT_URL, {
@@ -55,7 +56,10 @@ inputForm.addEventListener('submit', async (e) => {
     }
 
     // Remove loading message
-    chatBox.removeChild(chatBox.lastChild);
+    if (loadingMessage && loadingMessage.isConnected) {
+      loadingMessage.remove();
+      loadingMessage = null;
+    }
 
     // Add AI response
     if (data.success) {
@@ -76,10 +80,11 @@ inputForm.addEventListener('submit', async (e) => {
   } catch (error) {
     console.error('Error:', error);
     // Remove loading message
-    if (chatBox.lastChild.classList.contains('typing')) {
-      chatBox.removeChild(chatBox.lastChild);
+    if (loadingMessage && loadingMessage.isConnected) {
+      loadingMessage.remove();
+      loadingMessage = null;
     }
-    addMessage('❌ Koneksi gagal. Pastikan Apps Script URL sudah benar.', 'ai');
+    addMessage(`❌ ${error.message || 'Koneksi gagal. Pastikan Apps Script URL sudah benar.'}`, 'ai');
   } finally {
     messageInput.disabled = false;
     sendBtn.disabled = false;
@@ -114,6 +119,8 @@ function addMessage(text, type = 'ai', isLoading = false) {
 
   // Auto scroll ke bottom
   chatBox.scrollTop = chatBox.scrollHeight;
+
+  return messageDiv;
 }
 
 /**
