@@ -11,6 +11,7 @@ const state = {
   recapData: null,
   recapChart: null,
   recapLoading: false,
+  chartLibraryPromise: null,
 };
 
 const dom = {
@@ -28,6 +29,8 @@ const dom = {
   transactionCount: document.getElementById('transactionCount'),
   transactionsMeta: document.getElementById('transactionsMeta'),
   transactionsList: document.getElementById('transactionsList'),
+  allTransactionsTable: document.getElementById('allTransactionsTable'),
+  backFromAllBtn: document.getElementById('backFromAllBtn'),
   recapChart: document.getElementById('recapChart'),
   chartEmptyState: document.getElementById('chartEmptyState'),
   viewButtons: Array.from(document.querySelectorAll('[data-view]')),
@@ -96,6 +99,10 @@ function bindEvents() {
       switchView(nextView, { persist: false });
     }
   });
+
+  if (dom.backFromAllBtn) {
+    dom.backFromAllBtn.addEventListener('click', () => switchView('recap'));
+  }
 }
 
 function switchView(view, options = {}) {
@@ -390,18 +397,88 @@ function renderRecap(recapData, source = 'live') {
   const summary = recapData.summary || deriveSummary(recapData.transactions || []);
   const transactions = Array.isArray(recapData.transactions) ? recapData.transactions : [];
 
+  // show only today's transactions in the recap view
+  const todayTransactions = transactions.filter((t) => isSameCalendarDate(t.timestamp || t.date));
+
   dom.totalIncome.textContent = formatCurrency(summary.totalIncome || 0);
   dom.totalExpense.textContent = formatCurrency(summary.totalExpense || 0);
   dom.totalBalance.textContent = formatCurrency(summary.balance ?? (summary.totalIncome || 0) - (summary.totalExpense || 0));
   dom.transactionCount.textContent = String(summary.transactionCount ?? transactions.length ?? 0);
-  dom.transactionsMeta.textContent = `${transactions.length} item`;
+  // replace meta pill with a "Lihat semua" button
+  if (dom.transactionsMeta) {
+    dom.transactionsMeta.innerHTML = `<button id="viewAllBtn" class="ghost-button">Lihat semua transaksi</button>`;
+    const viewAllBtn = document.getElementById('viewAllBtn');
+    if (viewAllBtn) {
+      viewAllBtn.addEventListener('click', () => {
+        switchView('all');
+        loadAllTransactions();
+      });
+    }
+  }
 
   const timestamp = recapData.savedAt || recapData.updatedAt || new Date().toISOString();
   dom.recapUpdatedAt.textContent = formatDateTime(timestamp);
   dom.recapSourceBadge.textContent = source === 'live' ? 'Live' : 'Server';
 
-  renderTransactions(transactions);
+  renderTransactions(todayTransactions);
   renderRecapChart(summary);
+}
+
+function isSameCalendarDate(value, compareDate = new Date()) {
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getFullYear() === compareDate.getFullYear() && d.getMonth() === compareDate.getMonth() && d.getDate() === compareDate.getDate();
+}
+
+async function loadAllTransactions() {
+  try {
+    const payload = await fetchRecapPayload();
+    const transactions = Array.isArray(payload.transactions) ? payload.transactions : [];
+    renderAllTransactionsTable(transactions);
+  } catch (err) {
+    const container = dom.allTransactionsTable;
+    if (container && container.tBodies && container.tBodies[0]) {
+      container.tBodies[0].innerHTML = `<tr><td colspan="4">Gagal memuat transaksi: ${escapeHTML(String(err.message || err))}</td></tr>`;
+    }
+  }
+}
+
+function renderAllTransactionsTable(transactions) {
+  if (!dom.allTransactionsTable) return;
+  const tbody = dom.allTransactionsTable.tBodies[0] || dom.allTransactionsTable.createTBody();
+  tbody.innerHTML = '';
+
+  if (!transactions || transactions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4">Belum ada transaksi.</td></tr>';
+    return;
+  }
+
+  // newest first
+  const rows = [...transactions].reverse();
+  rows.forEach((tx) => {
+    const n = normalizeTransactionRecord(tx);
+    const tr = document.createElement('tr');
+
+    const tdDesc = document.createElement('td');
+    tdDesc.innerHTML = `<strong>${escapeHTML(n.description)}</strong>`;
+
+    const tdCat = document.createElement('td');
+    tdCat.textContent = formatCategoryLabel(n.category);
+
+    const tdDate = document.createElement('td');
+    tdDate.textContent = `${n.dateLabel} ${n.timeLabel}`;
+
+    const tdAmount = document.createElement('td');
+    tdAmount.style.textAlign = 'right';
+    tdAmount.textContent = `${n.type === 'income' ? '+' : '-'}${formatCurrency(n.amount)}`;
+
+    tr.appendChild(tdDesc);
+    tr.appendChild(tdCat);
+    tr.appendChild(tdDate);
+    tr.appendChild(tdAmount);
+    tbody.appendChild(tr);
+  });
 }
 
 function applyRecapData(recapData, source) {
@@ -431,30 +508,30 @@ function createTransactionNode(transaction) {
   const item = document.createElement('div');
   item.className = 'transaction-item';
 
+  const header = document.createElement('div');
+  header.className = 'transaction-header';
+
   const info = document.createElement('div');
   info.className = 'transaction-info';
 
   const title = document.createElement('strong');
   title.textContent = normalized.description || 'Transaksi';
 
-  const meta = document.createElement('div');
-  meta.className = 'transaction-meta';
-  meta.textContent = `${normalized.dateLabel} • ${normalized.timeLabel}`;
-
-  const category = document.createElement('div');
-  category.className = 'transaction-category';
-  category.textContent = formatCategoryLabel(normalized.category);
-
-  info.appendChild(title);
-  info.appendChild(meta);
-  info.appendChild(category);
-
   const amount = document.createElement('div');
   amount.className = `transaction-amount ${normalized.type}`;
   amount.textContent = `${normalized.type === 'income' ? '+' : '-'}${formatCurrency(normalized.amount)}`;
 
+  header.appendChild(title);
+  header.appendChild(amount);
+
+  const meta = document.createElement('div');
+  meta.className = 'transaction-meta';
+  meta.textContent = `${formatCategoryLabel(normalized.category)} | ${normalized.dateLabel} ${normalized.timeLabel}`;
+
+  info.appendChild(header);
+  info.appendChild(meta);
+
   item.appendChild(info);
-  item.appendChild(amount);
   return item;
 }
 
@@ -478,8 +555,18 @@ function renderRecapChart(summary) {
 
   if (typeof Chart === 'undefined') {
     dom.chartEmptyState.classList.remove('is-hidden');
-    dom.chartEmptyState.textContent = 'Chart.js belum termuat.';
+    dom.chartEmptyState.textContent = 'Memuat chart...';
     dom.recapChart.classList.add('is-hidden');
+    loadChartLibrary()
+      .then(() => {
+        if (state.recapData) {
+          renderRecapChart(state.recapData.summary || deriveSummary(state.recapData.transactions || []));
+        }
+      })
+      .catch(() => {
+        dom.chartEmptyState.classList.remove('is-hidden');
+        dom.chartEmptyState.textContent = 'Chart gagal dimuat.';
+      });
     return;
   }
 
@@ -532,6 +619,35 @@ function destroyRecapChart() {
     state.recapChart.destroy();
     state.recapChart = null;
   }
+}
+
+function loadChartLibrary() {
+  if (typeof Chart !== 'undefined') {
+    return Promise.resolve(Chart);
+  }
+
+  if (state.chartLibraryPromise) {
+    return state.chartLibraryPromise;
+  }
+
+  state.chartLibraryPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-chartjs="true"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(Chart));
+      existingScript.addEventListener('error', reject);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+    script.async = true;
+    script.dataset.chartjs = 'true';
+    script.onload = () => resolve(Chart);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+  return state.chartLibraryPromise;
 }
 
 function clearChatHistory() {
@@ -620,8 +736,8 @@ function deriveSummary(transactions) {
 function normalizeTransactionRecord(transaction) {
   const amount = Number(transaction?.amount || 0);
   const type = normalizeTransactionType(transaction?.type);
-  const dateLabel = transaction?.date || formatDateOnly(transaction?.timestamp) || '-';
-  const timeLabel = transaction?.time || formatTime(transaction?.timestamp) || '--:--';
+  const dateLabel = formatTransactionDateLabel(transaction?.date ?? transaction?.timestamp);
+  const timeLabel = formatTransactionTimeLabel(transaction?.time ?? transaction?.timestamp);
 
   return {
     type,
@@ -631,6 +747,70 @@ function normalizeTransactionRecord(transaction) {
     dateLabel,
     timeLabel,
   };
+}
+
+function formatTransactionDateLabel(value) {
+  if (!value) {
+    return '-';
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed.split('-').reverse().join('/');
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    }
+  }
+
+  const fallback = new Date(value);
+  if (!Number.isNaN(fallback.getTime())) {
+    return fallback.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
+  return String(value);
+}
+
+function formatTransactionTimeLabel(value) {
+  if (!value) {
+    return '--:--';
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const timeMatch = trimmed.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (timeMatch) {
+      return `${String(timeMatch[1]).padStart(2, '0')}:${timeMatch[2]}`;
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  }
+
+  const fallback = new Date(value);
+  if (!Number.isNaN(fallback.getTime())) {
+    return fallback.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  return String(value);
 }
 
 function normalizeTransactionType(value) {

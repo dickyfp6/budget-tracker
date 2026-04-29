@@ -155,6 +155,33 @@
             </article>
           </div>
         </section>
+
+        <section class="view" id="allView" data-view="all" aria-label="Halaman Semua Transaksi">
+          <div class="section-toolbar">
+            <div>
+              <p class="section-kicker">Semua transaksi</p>
+              <h2>Daftar lengkap transaksi</h2>
+            </div>
+            <button class="ghost-button" type="button" id="backFromAllBtn">Kembali</button>
+          </div>
+
+          <div class="panel-card transactions-card">
+            <div id="allTransactionsContainer">
+              <table class="all-transactions-table" id="allTransactionsTable" aria-describedby="allTransactionsDesc">
+                <caption id="allTransactionsDesc" class="sr-only">Tabel semua transaksi</caption>
+                <thead>
+                  <tr>
+                    <th>Keterangan</th>
+                    <th>Kategori</th>
+                    <th>Tanggal</th>
+                    <th style="text-align:right">Nominal</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </main>
 
       <nav class="mobile-nav" aria-label="Navigasi bawah">
@@ -169,7 +196,6 @@
       </nav>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
     <script src="script.js?v=6" defer></script>
   </body>
 </html>
