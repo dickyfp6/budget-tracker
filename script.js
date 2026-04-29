@@ -2,11 +2,8 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkVzUBKbKwFcPX
 
 const STORAGE_KEYS = {
   chat: 'budget-tracker-chat-history-v2',
-  recap: 'budget-tracker-recap-cache-v2',
   view: 'budget-tracker-active-view-v2',
 };
-
-const CACHE_TTL = 5 * 60 * 1000;
 
 const state = {
   currentView: 'chat',
@@ -162,9 +159,7 @@ async function handleSubmit(event) {
 
     if (payload.response) {
       state.chatMessages.push(
-        createMessageRecord('bot', payload.response, {
-          data: payload.data || null,
-        })
+        createMessageRecord('bot', payload.response)
       );
       persistChatHistory();
       renderChatFeed();
@@ -209,19 +204,10 @@ async function loadRecapData(options = {}) {
     return;
   }
 
-  const force = Boolean(options.force);
   state.recapLoading = true;
-  setRecapStatus('Memuat data...');
+  setRecapStatus('Memuat dari server...');
 
   try {
-    if (!force) {
-      const cached = readRecapCache();
-      if (cached) {
-        applyRecapData(cached, 'cache');
-        return;
-      }
-    }
-
     const payload = await fetchRecapPayload();
     const recapData = normalizeRecapPayload(payload);
 
@@ -229,7 +215,6 @@ async function loadRecapData(options = {}) {
       throw new Error('Recap payload tidak mengandung transactions atau summary.');
     }
 
-    saveRecapCache(recapData);
     applyRecapData(recapData, 'live');
   } catch (error) {
     setRecapError(error.message || 'Gagal memuat ringkasan.');
@@ -352,10 +337,6 @@ function createMessageNode(message) {
   content.innerHTML = formatRichText(message.text);
   bubble.appendChild(content);
 
-  if (message.data) {
-    bubble.appendChild(buildTransactionBox(message.data));
-  }
-
   const time = document.createElement('span');
   time.className = 'message-time';
   time.textContent = formatTime(message.timestamp);
@@ -363,24 +344,6 @@ function createMessageNode(message) {
   row.appendChild(bubble);
   row.appendChild(time);
   return row;
-}
-
-function buildTransactionBox(data) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'transaction-box';
-
-  const typeLabel = normalizeTransactionType(data.type) === 'income' ? '📥 Pemasukan' : '📤 Pengeluaran';
-  const amount = formatCurrency(data.amount);
-
-  wrapper.innerHTML = `
-    <div><strong>💾 Tersimpan:</strong></div>
-    <div>${escapeHTML(typeLabel)}</div>
-    <div>Nominal: ${escapeHTML(amount)}</div>
-    <div>Kategori: ${escapeHTML(formatCategoryLabel(data.category))}</div>
-    <div>Keterangan: ${escapeHTML(data.description || '-')}</div>
-  `;
-
-  return wrapper;
 }
 
 function appendLoadingMessage() {
@@ -434,8 +397,8 @@ function renderRecap(recapData, source = 'live') {
   dom.transactionsMeta.textContent = `${transactions.length} item`;
 
   const timestamp = recapData.savedAt || recapData.updatedAt || new Date().toISOString();
-  dom.recapUpdatedAt.textContent = source === 'cache' ? 'Cache lokal' : formatDateTime(timestamp);
-  dom.recapSourceBadge.textContent = source === 'cache' ? 'Cache' : 'Live';
+  dom.recapUpdatedAt.textContent = formatDateTime(timestamp);
+  dom.recapSourceBadge.textContent = source === 'live' ? 'Live' : 'Server';
 
   renderTransactions(transactions);
   renderRecapChart(summary);
@@ -602,34 +565,7 @@ function loadChatHistory() {
 }
 
 function readRecapCache() {
-  const raw = readStorage(STORAGE_KEYS.recap);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      return null;
-    }
-
-    if (Date.now() - Number(parsed.savedAtMs || 0) > CACHE_TTL) {
-      return null;
-    }
-
-    return parsed.data || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function saveRecapCache(recapData) {
-  const payload = {
-    savedAtMs: Date.now(),
-    data: recapData,
-  };
-
-  writeStorage(STORAGE_KEYS.recap, JSON.stringify(payload));
+  return null;
 }
 
 function normalizeRecapPayload(payload) {

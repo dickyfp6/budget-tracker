@@ -18,7 +18,13 @@ const SHEET_NAME = 'Transaksi';
 const GITHUB_TOKEN = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
 
 // ============= ENTRY POINT =============
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'recap') {
+    return ContentService.createTextOutput(
+      JSON.stringify(getRecapPayload())
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput('✅ Budget Tracker Backend is running').setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -26,17 +32,18 @@ function doGet() {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    const message = data.message;
+    const message = data.message || '';
+
+    if (data.action === 'recap') {
+      return ContentService.createTextOutput(
+        JSON.stringify(getRecapPayload())
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
 
     // Cek jika #recap command
     if (message.toLowerCase().includes('#recap')) {
-      const summary = getSummary();
       return ContentService.createTextOutput(
-        JSON.stringify({
-          success: true,
-          response: formatSummaryResponse(summary),
-          summary: summary,
-        })
+        JSON.stringify(getRecapPayload())
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -59,7 +66,7 @@ function doPost(e) {
     // Format response
     const typeLabel =
       parsed.data.type === 'income' ? '📥 Pemasukan' : '📤 Pengeluaran';
-    const response = `✅ **Transaksi Tersimpan**\n\n${typeLabel}\nRp${formatNumber(
+    const response = `✅ **Dicatat**\n\n${typeLabel}\nRp${formatNumber(
       parsed.data.amount
     )}\nKategori: ${parsed.data.category}\nKeterangan: ${parsed.data.description}`;
 
@@ -225,21 +232,12 @@ Output: {"type": "income", "amount": 5000000, "category": "salary", "description
 function parseTransactionLocally(message) {
   const normalized = message.toLowerCase().trim();
 
-  const amountMatch = normalized.match(/(\d+[\d.,]*)\s*(rb|ribu|k|jt|juta)?/i);
-  if (!amountMatch) {
+  const amountEntries = extractMoneyValues(normalized);
+  if (!amountEntries.length) {
     return { success: false };
   }
 
-  const rawAmount = amountMatch[1].replace(/[.,]/g, '');
-  let amount = parseInt(rawAmount, 10);
-  const unit = (amountMatch[2] || '').toLowerCase();
-
-  if (unit === 'rb' || unit === 'ribu' || unit === 'k') {
-    amount *= 1000;
-  } else if (unit === 'jt' || unit === 'juta') {
-    amount *= 1000000;
-  }
-
+  const amount = amountEntries.reduce((total, entry) => total + entry.amount, 0);
   if (!amount || Number.isNaN(amount) || amount <= 0) {
     return { success: false };
   }
@@ -249,30 +247,14 @@ function parseTransactionLocally(message) {
     type = 'income';
   }
 
-  let category = 'other';
-  if (/\b(makan|minum|pentol|nasi|ayam|kopi|jajan)\b/i.test(normalized)) {
-    category = 'food';
-  } else if (/\b(gojek|grab|transport|bensin|parkir)\b/i.test(normalized)) {
-    category = 'transport';
-  } else if (/\b(listrik|air|internet|pulsa)\b/i.test(normalized)) {
-    category = 'utilities';
-  } else if (/\b(gaji|gajian|bonus|insentif)\b/i.test(normalized)) {
-    category = 'salary';
-  } else if (/\b(transfer|top up|topup)\b/i.test(normalized)) {
-    category = 'transfer';
-  } else if (/\b(belanja|beli|shopping)\b/i.test(normalized)) {
-    category = 'shopping';
-  } else if (/\b(netflix|game|bioskop|film|konser)\b/i.test(normalized)) {
-    category = 'entertainment';
-  } else if (/\b(dokter|obat|rumah sakit|rs|vitamin)\b/i.test(normalized)) {
-    category = 'health';
-  }
-
-  const description = normalized
-    .replace(/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk|beli|bayar|jajan|top up|topup)\b/i, '')
-    .replace(/\b\d+[\d.,]*\s*(rb|ribu|k|jt|juta)?\b/i, '')
-    .replace(/\s+/g, ' ')
-    .trim() || normalized;
+  const category = detectCategory(normalized, amountEntries.length);
+  const description = amountEntries.length > 1
+    ? normalized
+    : normalized
+      .replace(/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk|beli|bayar|jajan|top up|topup)\b/i, '')
+      .replace(/\b\d+[\d.,]*\s*(rb|ribu|k|jt|juta)?\b/i, '')
+      .replace(/\s+/g, ' ')
+      .trim() || normalized;
 
   return {
     success: true,
@@ -282,8 +264,75 @@ function parseTransactionLocally(message) {
       category,
       description,
       timestamp: new Date().toISOString(),
+      items: amountEntries,
     },
   };
+}
+
+function extractMoneyValues(message) {
+  const pattern = /(\d+(?:[.,]\d+)?)(?:\s*(rb|ribu|k|jt|juta))?/gi;
+  const entries = [];
+  let match;
+
+  while ((match = pattern.exec(message)) !== null) {
+    const valueText = match[1];
+    const unitText = (match[2] || '').toLowerCase();
+    const amount = normalizeMoneyValue(valueText, unitText);
+
+    if (amount > 0) {
+      entries.push({ amount, raw: match[0].trim() });
+    }
+  }
+
+  return entries;
+}
+
+function normalizeMoneyValue(valueText, unitText) {
+  const normalizedValue = valueText.replace(/[.]/g, '').replace(',', '.');
+  const numericValue = Number(normalizedValue);
+
+  if (Number.isNaN(numericValue) || numericValue <= 0) {
+    return 0;
+  }
+
+  const digitsOnly = valueText.replace(/\D/g, '');
+  const hasUnit = Boolean(unitText);
+
+  if (!hasUnit && digitsOnly.length < 4 && !/[.,]/.test(valueText)) {
+    return 0;
+  }
+
+  let amount = numericValue;
+  if (unitText === 'rb' || unitText === 'ribu' || unitText === 'k') {
+    amount *= 1000;
+  } else if (unitText === 'jt' || unitText === 'juta') {
+    amount *= 1000000;
+  }
+
+  return Math.round(amount);
+}
+
+function detectCategory(message, itemCount) {
+  const categories = [
+    { key: 'salary', patterns: [/\b(gaji|gajian|bonus|insentif)\b/i] },
+    { key: 'utilities', patterns: [/\b(listrik|air|internet|pulsa)\b/i] },
+    { key: 'transport', patterns: [/\b(gojek|grab|transport|bensin|parkir)\b/i] },
+    { key: 'food', patterns: [/\b(makan|minum|pentol|nasi|ayam|kopi|jajan)\b/i] },
+    { key: 'shopping', patterns: [/\b(belanja|beli|shopping)\b/i] },
+    { key: 'entertainment', patterns: [/\b(netflix|game|bioskop|film|konser)\b/i] },
+    { key: 'health', patterns: [/\b(dokter|obat|rumah sakit|rs|vitamin)\b/i] },
+    { key: 'transfer', patterns: [/\b(transfer|top up|topup)\b/i] },
+  ];
+
+  const matchedCategories = categories
+    .filter((entry) => entry.patterns.some((pattern) => pattern.test(message)))
+    .map((entry) => entry.key);
+
+  if (itemCount > 1 && matchedCategories.length > 1) {
+    return 'other';
+  }
+
+  return matchedCategories[0] || 'other';
 }
 
 // ============= GOOGLE SHEETS FUNCTIONS =============
@@ -332,6 +381,43 @@ function getSummary() {
     totalExpense,
     balance: totalIncome - totalExpense,
     transactionCount: data.length - 1,
+  };
+}
+
+function getTransactions() {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+
+  const transactions = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row || row.length < 6) {
+      continue;
+    }
+
+    transactions.push({
+      date: row[0] || '',
+      time: row[1] || '',
+      type: row[2] || 'Pengeluaran',
+      amount: Number(row[3] || 0),
+      category: row[4] || 'other',
+      description: row[5] || '',
+    });
+  }
+
+  return transactions;
+}
+
+function getRecapPayload() {
+  const summary = getSummary();
+  const transactions = getTransactions();
+
+  return {
+    success: true,
+    transactions: transactions,
+    summary: summary,
+    updatedAt: new Date().toISOString(),
   };
 }
 
