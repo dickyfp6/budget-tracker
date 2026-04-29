@@ -31,6 +31,10 @@ const dom = {
   transactionsList: document.getElementById('transactionsList'),
   allTransactionsTable: document.getElementById('allTransactionsTable'),
   backFromAllBtn: document.getElementById('backFromAllBtn'),
+  filterFrom: document.getElementById('filterFrom'),
+  filterTo: document.getElementById('filterTo'),
+  applyFilterBtn: document.getElementById('applyFilterBtn'),
+  downloadCsvBtn: document.getElementById('downloadCsvBtn'),
   recapChart: document.getElementById('recapChart'),
   chartEmptyState: document.getElementById('chartEmptyState'),
   viewButtons: Array.from(document.querySelectorAll('[data-view]')),
@@ -102,6 +106,21 @@ function bindEvents() {
 
   if (dom.backFromAllBtn) {
     dom.backFromAllBtn.addEventListener('click', () => switchView('recap'));
+  }
+  if (dom.applyFilterBtn) {
+    dom.applyFilterBtn.addEventListener('click', () => {
+      if (state.allTransactionsCache) {
+        const filtered = getFilteredTransactions(state.allTransactionsCache);
+        renderAllTransactionsTable(filtered);
+      }
+    });
+  }
+
+  if (dom.downloadCsvBtn) {
+    dom.downloadCsvBtn.addEventListener('click', () => {
+      const data = state.allTransactionsCache || [];
+      downloadAllTransactionsCSV(data);
+    });
   }
 }
 
@@ -435,6 +454,7 @@ async function loadAllTransactions() {
   try {
     const payload = await fetchRecapPayload();
     const transactions = Array.isArray(payload.transactions) ? payload.transactions : [];
+    state.allTransactionsCache = transactions;
     renderAllTransactionsTable(transactions);
   } catch (err) {
     const container = dom.allTransactionsTable;
@@ -479,6 +499,53 @@ function renderAllTransactionsTable(transactions) {
     tr.appendChild(tdAmount);
     tbody.appendChild(tr);
   });
+}
+
+function getFilteredTransactions(transactions) {
+  if (!transactions || transactions.length === 0) return [];
+  const fromVal = dom.filterFrom && dom.filterFrom.value ? new Date(dom.filterFrom.value) : null;
+  const toVal = dom.filterTo && dom.filterTo.value ? new Date(dom.filterTo.value) : null;
+
+  return transactions.filter((t) => {
+    const d = new Date(t.timestamp || t.date || t.savedAt || t.createdAt || null);
+    if (Number.isNaN(d.getTime())) return false;
+    if (fromVal && d < new Date(fromVal.getFullYear(), fromVal.getMonth(), fromVal.getDate())) return false;
+    if (toVal && d > new Date(toVal.getFullYear(), toVal.getMonth(), toVal.getDate(), 23, 59, 59)) return false;
+    return true;
+  });
+}
+
+function downloadAllTransactionsCSV(transactions) {
+  const rows = [['Keterangan','Kategori','Tanggal','Jam','Nominal','Tipe']];
+  (transactions || []).forEach((tx) => {
+    const n = normalizeTransactionRecord(tx);
+    rows.push([
+      escapeCSV(n.description),
+      escapeCSV(formatCategoryLabel(n.category)),
+      escapeCSV(n.dateLabel),
+      escapeCSV(n.timeLabel),
+      escapeCSV((n.type === 'income' ? '+' : '-') + formatCurrency(n.amount)),
+      escapeCSV(n.type),
+    ]);
+  });
+
+  const csv = rows.map((r) => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `budget-tracker-transactions-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeCSV(value) {
+  if (value == null) return '';
+  const s = String(value).replace(/"/g, '""');
+  if (s.search(/,|\n|"/) >= 0) return `"${s}"`;
+  return s;
 }
 
 function applyRecapData(recapData, source) {

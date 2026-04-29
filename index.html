@@ -167,6 +167,14 @@
 
           <div class="panel-card transactions-card">
             <div id="allTransactionsContainer">
+              <div class="all-controls">
+                <label>Filter: </label>
+                <input type="date" id="filterFrom" />
+                <span style="margin:0 6px">—</span>
+                <input type="date" id="filterTo" />
+                <button class="ghost-button" type="button" id="applyFilterBtn">Terapkan</button>
+                <button class="ghost-button" type="button" id="downloadCsvBtn">Download CSV</button>
+              </div>
               <table class="all-transactions-table" id="allTransactionsTable" aria-describedby="allTransactionsDesc">
                 <caption id="allTransactionsDesc" class="sr-only">Tabel semua transaksi</caption>
                 <thead>
