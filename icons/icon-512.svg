@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Budget Tracker AI icon">
+  <rect width="512" height="512" rx="112" fill="#f5f7fb"/>
+  <rect x="68" y="68" width="376" height="376" rx="96" fill="#ffffff" stroke="#d9e1ec" stroke-width="18"/>
+  <path d="M160 154h192c17.7 0 32 14.3 32 32v140c0 17.7-14.3 32-32 32H160c-17.7 0-32-14.3-32-32V186c0-17.7 14.3-32 32-32z" fill="#2563eb"/>
+  <path d="M182 208h148M182 256h88M182 304h112" stroke="#ffffff" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="352" cy="208" r="18" fill="#16a34a"/>
+</svg>

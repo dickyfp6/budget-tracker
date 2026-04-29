@@ -63,6 +63,7 @@ function init() {
   bindEvents();
   switchView(state.currentView, { persist: false, refreshRecap: false });
   renderChatFeed();
+  registerServiceWorker();
 
   if (state.currentView === 'recap') {
     loadRecapData();
@@ -810,4 +811,16 @@ function escapeHTML(value) {
 function capitalize(value) {
   const text = String(value || '');
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch((error) => {
+      console.warn('Service worker registration failed:', error);
+    });
+  });
 }
