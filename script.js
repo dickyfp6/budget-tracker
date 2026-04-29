@@ -47,6 +47,9 @@ inputForm.addEventListener('submit', async (e) => {
     }
 
     const rawResponse = await response.text();
+    if (!rawResponse.trim()) {
+      throw new Error('Apps Script mengembalikan respons kosong. Cek deployment Web App dan pastikan URL yang dipakai adalah URL /exec dari deployment terbaru.');
+    }
     let data;
 
     try {
