@@ -669,7 +669,7 @@ a {
 
 @media (max-width: 900px) {
   body {
-    overflow: hidden;
+    overflow: auto;
   }
 
   .app-shell {
@@ -757,6 +757,46 @@ a {
   .chat-panel {
     min-height: calc(100dvh - 184px);
   }
+}
+
+/* Additional mobile fixes (stacking, table scrolling, compact spacing) */
+@media (max-width: 700px) {
+  .recap-grid {
+    grid-template-areas:
+      'hero'
+      'chart'
+      'list';
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 8px;
+  }
+
+  .summary-card,
+  .chart-card,
+  .transactions-card {
+    padding: 12px;
+  }
+
+  .chart-wrap { min-height: 180px; }
+  #recapChart { max-height: 220px; }
+
+  /* Keep mobile nav visible and compact */
+  .mobile-nav { display: flex; position: fixed; left: 8px; right: 8px; bottom: 8px; justify-content: center; gap: 8px; z-index: 40; }
+  .mobile-nav .nav-item { padding: 8px 10px; border-radius: 12px; }
+
+  /* Make the all-controls wrap and be touch friendly */
+  .all-controls { flex-wrap: wrap; gap: 6px; }
+  .all-controls input[type="date"] { min-width: 120px; }
+  .all-controls .ghost-button { padding: 8px 10px; font-size: 0.86rem; }
+
+  /* Table responsiveness: allow horizontal scroll on small widths */
+  #allTransactionsContainer { overflow: auto; -webkit-overflow-scrolling: touch; }
+  .all-transactions-table { min-width: 620px; }
+
+  /* Compact transaction cards */
+  .transaction-item { padding: 10px; }
+  .transaction-item strong { font-size: 0.9rem; }
+  .transaction-meta { font-size: 0.72rem; }
 }
 
 @media (max-width: 560px) {
