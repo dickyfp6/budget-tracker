@@ -35,15 +35,24 @@ inputForm.addEventListener('submit', async (e) => {
     // Call Google Apps Script
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors', // Apps Script tidak support CORS, tapi ini fallback
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({ message }),
     });
 
-    // Jika menggunakan doPost endpoint
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const rawResponse = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(rawResponse);
+    } catch (parseError) {
+      throw new Error(`Apps Script mengembalikan respons non-JSON: ${rawResponse.slice(0, 120)}`);
+    }
 
     // Remove loading message
     chatBox.removeChild(chatBox.lastChild);
