@@ -60,21 +60,19 @@ function doPost(e) {
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
+    const transactions = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+
     // Simpan ke Google Sheets
-    saveTransaction(parsed.data);
+    saveTransactions(transactions);
 
     // Format response
-    const typeLabel =
-      parsed.data.type === 'income' ? '📥 Pemasukan' : '📤 Pengeluaran';
-    const response = `✅ **Dicatat**\n\n${typeLabel}\nRp${formatNumber(
-      parsed.data.amount
-    )}\nKategori: ${parsed.data.category}\nKeterangan: ${parsed.data.description}`;
+    const response = formatTransactionResponse(transactions);
 
     return ContentService.createTextOutput(
       JSON.stringify({
         success: true,
         response: response,
-        data: parsed.data,
+        data: transactions.length === 1 ? transactions[0] : transactions,
       })
     ).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -230,14 +228,36 @@ Output: {"type": "income", "amount": 5000000, "category": "salary", "description
 }
 
 function parseTransactionLocally(message) {
-  const normalized = message.toLowerCase().trim();
+  const clauses = splitTransactionClauses(message);
+  const parsedTransactions = [];
 
+  for (const clause of clauses) {
+    const parsed = parseSingleTransactionClause(clause);
+    if (parsed.success) {
+      parsedTransactions.push(parsed.data);
+    }
+  }
+
+  if (!parsedTransactions.length) {
+    return { success: false };
+  }
+
+  return {
+    success: true,
+    data: parsedTransactions.length === 1 ? parsedTransactions[0] : parsedTransactions,
+  };
+}
+
+function parseSingleTransactionClause(clause) {
+  const normalized = clause.toLowerCase().trim();
   const amountEntries = extractMoneyValues(normalized);
+
   if (!amountEntries.length) {
     return { success: false };
   }
 
-  const amount = amountEntries.reduce((total, entry) => total + entry.amount, 0);
+  const amount = amountEntries[0].amount;
+
   if (!amount || Number.isNaN(amount) || amount <= 0) {
     return { success: false };
   }
@@ -247,14 +267,12 @@ function parseTransactionLocally(message) {
     type = 'income';
   }
 
-  const category = detectCategory(normalized, amountEntries.length);
-  const description = amountEntries.length > 1
-    ? normalized
-    : normalized
-      .replace(/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk|beli|bayar|jajan|top up|topup)\b/i, '')
-      .replace(/\b\d+[\d.,]*\s*(rb|ribu|k|jt|juta)?\b/i, '')
-      .replace(/\s+/g, ' ')
-      .trim() || normalized;
+  const category = detectCategory(normalized, 1);
+  const description = normalized
+    .replace(/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk|beli|bayar|jajan|top up|topup|terus|lalu|kemudian|trus|sama|plus|dan)\b/i, '')
+    .replace(/\b\d+[\d.,]*\s*(rb|ribu|k|jt|juta)?\b/i, '')
+    .replace(/\s+/g, ' ')
+    .trim() || normalized;
 
   return {
     success: true,
@@ -267,6 +285,16 @@ function parseTransactionLocally(message) {
       items: amountEntries,
     },
   };
+}
+
+function splitTransactionClauses(message) {
+  const normalized = String(message || '').replace(/\s+/g, ' ').trim();
+  const parts = normalized
+    .split(/\b(?:terus|lalu|kemudian|trus|sama|plus|dan)\b|[;•\n]+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.length ? parts : [normalized];
 }
 
 function extractMoneyValues(message) {
@@ -333,6 +361,30 @@ function detectCategory(message, itemCount) {
   }
 
   return matchedCategories[0] || 'other';
+}
+
+function saveTransactions(transactions) {
+  transactions.forEach((transactionData) => saveTransaction(transactionData));
+}
+
+function formatTransactionResponse(transactions) {
+  if (!transactions.length) {
+    return '✅ **Dicatat**';
+  }
+
+  const totalAmount = transactions.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+  const header = transactions.length === 1
+    ? '✅ **Dicatat**'
+    : `✅ **${transactions.length} Transaksi Dicatat**`;
+
+  const lines = transactions.map((transaction, index) => {
+    const typeLabel = transaction.type === 'income' ? '📥 Pemasukan' : '📤 Pengeluaran';
+    const amount = `Rp${formatNumber(transaction.amount)}`;
+    const label = transactions.length > 1 ? `${index + 1}. ` : '';
+    return `${label}${typeLabel} - ${amount} - ${transaction.description}`;
+  });
+
+  return `${header}\n\n${lines.join('\n')}\n\nTotal: Rp${formatNumber(totalAmount)}`;
 }
 
 // ============= GOOGLE SHEETS FUNCTIONS =============

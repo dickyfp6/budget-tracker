@@ -1,9 +1,9 @@
-const CACHE_NAME = 'budget-tracker-ai-v1';
+const CACHE_NAME = 'budget-tracker-ai-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
-  './script.js?v=5',
+  './script.js?v=6',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.svg',

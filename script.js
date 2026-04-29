@@ -168,7 +168,6 @@ async function handleSubmit(event) {
 
     const recapPayload = normalizeRecapPayload(payload);
     if (recapPayload) {
-      saveRecapCache(recapPayload);
       applyRecapData(recapPayload, 'live');
     }
 
