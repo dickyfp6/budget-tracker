@@ -3,68 +3,164 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>💰 Budget Tracker Chat</title>
+    <meta name="theme-color" content="#0b1220" />
+    <title>Budget Tracker AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="container">
-      <!-- Header -->
-      <div class="header">
-        <h1>💰 Budget Tracker</h1>
-        <p>Catat pengeluaran dengan chat</p>
-      </div>
-
-      <!-- Chat Box -->
-      <div class="chat-box" id="chatBox">
-        <div class="message ai">
-          <div class="bubble">
-            Halo! 👋 Saya siap membantu catat transaksi Anda. Cukup ketik
-            seperti:
-            <br />
-            • "beli makan 50rb"
-            <br />
-            • "gajian 5 juta"
-            <br />
-            • "bayar listrik 200rb"
-            <br />
-            <br />
-            Atau ketik "<strong>#recap</strong>" untuk lihat ringkasan.
-          </div>
-          <span class="time">Sekarang</span>
-        </div>
-      </div>
-
-      <!-- Summary Box -->
-      <div class="summary-box" id="summaryBox" style="display: none">
-        <h3>📊 Ringkasan Bulan Ini</h3>
-        <div class="summary-grid">
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark">BT</div>
           <div>
-            <span>Pemasukan</span>
-            <strong class="income" id="totalIncome">Rp0</strong>
-          </div>
-          <div>
-            <span>Pengeluaran</span>
-            <strong class="expense" id="totalExpense">Rp0</strong>
-          </div>
-          <div>
-            <span>Saldo</span>
-            <strong id="totalBalance">Rp0</strong>
+            <p class="eyebrow">Personal Budget Tracker</p>
+            <h1>Chat AI Keuangan</h1>
           </div>
         </div>
-      </div>
 
-      <!-- Input Form -->
-      <form class="input-form" id="inputForm">
-        <input
-          type="text"
-          id="messageInput"
-          placeholder="Ketik pesan atau #recap..."
-          autocomplete="off"
-        />
-        <button type="submit" id="sendBtn">➤</button>
-      </form>
+        <nav class="desktop-nav" aria-label="Navigasi utama">
+          <button class="nav-pill is-active" type="button" data-view="chat">
+            <span>💬</span>
+            <span>Chat</span>
+          </button>
+          <button class="nav-pill" type="button" data-view="recap">
+            <span>📊</span>
+            <span>Ringkasan</span>
+          </button>
+        </nav>
+      </header>
+
+      <main class="app-main">
+        <section class="view is-active" id="chatView" data-view="chat" aria-label="Halaman Chat">
+          <div class="section-toolbar">
+            <div>
+              <p class="section-kicker">Ruang chat</p>
+              <h2>Catat transaksi dengan bahasa biasa</h2>
+            </div>
+            <button class="ghost-button" type="button" id="clearChatBtn">
+              Hapus riwayat chat
+            </button>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-feed" id="chatMessages" aria-live="polite"></div>
+
+            <div class="chat-composer">
+              <div class="quick-chips" aria-label="Contoh pesan cepat">
+                <button type="button" class="chip" data-suggestion="beli makan 50rb">beli makan 50rb</button>
+                <button type="button" class="chip" data-suggestion="gajian 5 juta">gajian 5 juta</button>
+                <button type="button" class="chip" data-suggestion="#recap">#recap</button>
+              </div>
+
+              <form class="composer-form" id="chatForm">
+                <input
+                  type="text"
+                  id="messageInput"
+                  placeholder="Tulis transaksi, misalnya: beli kopi 20rb"
+                  autocomplete="off"
+                  inputmode="text"
+                />
+                <button type="submit" id="sendBtn">Kirim</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="recapView" data-view="recap" aria-label="Halaman Ringkasan">
+          <div class="section-toolbar">
+            <div>
+              <p class="section-kicker">Ringkasan</p>
+              <h2>Arus pemasukan, pengeluaran, dan saldo</h2>
+            </div>
+            <button class="ghost-button" type="button" id="refreshRecapBtn">
+              Muat ulang
+            </button>
+          </div>
+
+          <div class="recap-grid">
+            <article class="summary-card hero-card">
+              <div class="summary-head">
+                <div>
+                  <p class="summary-label">Pembaruan terakhir</p>
+                  <h3 id="recapUpdatedAt">Menunggu data...</h3>
+                </div>
+                <span class="status-badge" id="recapSourceBadge">Belum dimuat</span>
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-card income">
+                  <span>Pemasukan</span>
+                  <strong id="totalIncome">Rp0</strong>
+                </div>
+                <div class="metric-card expense">
+                  <span>Pengeluaran</span>
+                  <strong id="totalExpense">Rp0</strong>
+                </div>
+                <div class="metric-card balance">
+                  <span>Saldo</span>
+                  <strong id="totalBalance">Rp0</strong>
+                </div>
+                <div class="metric-card neutral">
+                  <span>Transaksi</span>
+                  <strong id="transactionCount">0</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel-card chart-card">
+              <div class="panel-head">
+                <div>
+                  <p class="panel-label">Komposisi dana</p>
+                  <h3>Pie chart pemasukan vs pengeluaran</h3>
+                </div>
+              </div>
+
+              <div class="chart-wrap">
+                <canvas id="recapChart" aria-label="Pie chart ringkasan keuangan"></canvas>
+                <div class="empty-state is-hidden" id="chartEmptyState">
+                  Belum ada data untuk ditampilkan.
+                </div>
+              </div>
+            </article>
+
+            <article class="panel-card transactions-card">
+              <div class="panel-head">
+                <div>
+                  <p class="panel-label">Daftar transaksi</p>
+                  <h3>Transaksi terbaru dari backend</h3>
+                </div>
+                <span class="count-pill" id="transactionsMeta">0 item</span>
+              </div>
+
+              <div class="transactions-list" id="transactionsList">
+                <div class="empty-state">
+                  Ringkasan akan muncul setelah data dimuat.
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <nav class="mobile-nav" aria-label="Navigasi bawah">
+        <button class="nav-item is-active" type="button" data-view="chat">
+          <span>💬</span>
+          <span>Chat</span>
+        </button>
+        <button class="nav-item" type="button" data-view="recap">
+          <span>📊</span>
+          <span>Ringkasan</span>
+        </button>
+      </nav>
     </div>
 
-    <script src="script.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="script.js?v=4" defer></script>
   </body>
 </html>
