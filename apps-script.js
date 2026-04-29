@@ -83,6 +83,11 @@ function doPost(e) {
 // ============= GITHUB MODELS PARSING =============
 function parseWithGitHub(message) {
   try {
+    const localParsed = parseTransactionLocally(message);
+    if (localParsed.success) {
+      return { success: true, data: localParsed.data };
+    }
+
     if (!GITHUB_TOKEN) {
       Logger.log('ERROR: GITHUB_TOKEN tidak diset di PropertiesService');
       return {
@@ -214,6 +219,70 @@ Output: {"type": "income", "amount": 5000000, "category": "salary", "description
       error: error.toString(),
     };
   }
+}
+
+function parseTransactionLocally(message) {
+  const normalized = message.toLowerCase().trim();
+
+  const amountMatch = normalized.match(/(\d+[\d.,]*)\s*(rb|ribu|k|jt|juta)?/i);
+  if (!amountMatch) {
+    return { success: false };
+  }
+
+  const rawAmount = amountMatch[1].replace(/[.,]/g, '');
+  let amount = parseInt(rawAmount, 10);
+  const unit = (amountMatch[2] || '').toLowerCase();
+
+  if (unit === 'rb' || unit === 'ribu' || unit === 'k') {
+    amount *= 1000;
+  } else if (unit === 'jt' || unit === 'juta') {
+    amount *= 1000000;
+  }
+
+  if (!amount || Number.isNaN(amount) || amount <= 0) {
+    return { success: false };
+  }
+
+  let type = 'expense';
+  if (/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk)\b/i.test(normalized)) {
+    type = 'income';
+  }
+
+  let category = 'other';
+  if (/\b(makan|minum|pentol|nasi|ayam|kopi|jajan)\b/i.test(normalized)) {
+    category = 'food';
+  } else if (/\b(gojek|grab|transport|bensin|parkir)\b/i.test(normalized)) {
+    category = 'transport';
+  } else if (/\b(listrik|air|internet|pulsa)\b/i.test(normalized)) {
+    category = 'utilities';
+  } else if (/\b(gaji|gajian|bonus|insentif)\b/i.test(normalized)) {
+    category = 'salary';
+  } else if (/\b(transfer|top up|topup)\b/i.test(normalized)) {
+    category = 'transfer';
+  } else if (/\b(belanja|beli|shopping)\b/i.test(normalized)) {
+    category = 'shopping';
+  } else if (/\b(netflix|game|bioskop|film|konser)\b/i.test(normalized)) {
+    category = 'entertainment';
+  } else if (/\b(dokter|obat|rumah sakit|rs|vitamin)\b/i.test(normalized)) {
+    category = 'health';
+  }
+
+  const description = normalized
+    .replace(/\b(gaji|gajian|bonus|insentif|salary|transfer masuk|masuk|beli|bayar|jajan|top up|topup)\b/i, '')
+    .replace(/\b\d+[\d.,]*\s*(rb|ribu|k|jt|juta)?\b/i, '')
+    .replace(/\s+/g, ' ')
+    .trim() || normalized;
+
+  return {
+    success: true,
+    data: {
+      type,
+      amount,
+      category,
+      description,
+      timestamp: new Date().toISOString(),
+    },
+  };
 }
 
 // ============= GOOGLE SHEETS FUNCTIONS =============
