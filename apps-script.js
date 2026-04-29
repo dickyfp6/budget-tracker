@@ -5,60 +5,22 @@
  * 1. Buat Google Sheet baru untuk menyimpan transaksi
  * 2. Buat Google Apps Script baru di menu Extensions → Apps Script
  * 3. Copy code ini ke file baru di Apps Script
- * 4. Set SHEET_ID, GITHUB_TOKEN di bawah
+ * 4. Set SHEET_ID, GITHUB_TOKEN di PropertiesService
  * 5. Deploy → New Deployment → Web App
  * 6. Copy URL dan paste ke script.js (APPS_SCRIPT_URL)
  */
 
 // ============= KONFIGURASI =============
-const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE'; // Copy dari URL spreadsheet
-const SHEET_NAME = 'Transaksi'; // Nama sheet di Google Sheets
-const GITHUB_TOKEN = 'ghu_YOUR_TOKEN_HERE'; // GitHub Personal Access Token
+const SHEET_ID = '14lUmzOf7_3iDMSCuCNgXRMaSy8HqZ3nCYPG5SJmkYME';
+const SHEET_NAME = 'Transaksi';
 
-// System prompt untuk AI parsing
-const SYSTEM_PROMPT = `Anda adalah assistant keuangan yang ahli dalam parsing transaksi finansial berbahasa Indonesia.
+// Get token dari PropertiesService (lebih aman, tidak hardcode di code)
+const GITHUB_TOKEN = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
 
-TASK: Parse pesan user dan ekstrak informasi transaksi ke dalam format JSON.
-
-INSTRUKSI:
-1. Jika pesan adalah transaksi, extract ke JSON:
-{
-  "type": "expense" atau "income",
-  "amount": number (nominal dalam Rupiah, integer saja),
-  "category": "string" (pilih dari: food, transport, utilities, salary, transfer, shopping, entertainment, health, other),
-  "description": "string"
+// ============= ENTRY POINT =============
+function doGet() {
+  return ContentService.createTextOutput('✅ Budget Tracker Backend is running').setMimeType(ContentService.MimeType.TEXT);
 }
-
-2. Jika bukan transaksi atau tidak jelas:
-{
-  "success": false,
-  "message": "Pesan bukan transaksi"
-}
-
-3. JANGAN tambah teks lain, hanya JSON!
-
-PARSING RULES:
-- "rb" atau "k" = ribu (1000)
-- "juta" = 1.000.000
-- Contoh: "7rb" = 7000, "2.5 juta" = 2500000
-
-KATEGORI:
-- food: makanan, minum, jajan
-- transport: gojek, bensin, parkir
-- utilities: listrik, air, internet, pulsa
-- salary: gajian, bonus, insentif
-- transfer: transfer uang, top up
-- shopping: belanja barang
-- entertainment: netflix, game, bioskop
-- health: dokter, obat
-- other: lainnya
-
-CONTOH:
-Input: "beli pentol 7000"
-Output: {"type": "expense", "amount": 7000, "category": "food", "description": "pentol"}
-
-Input: "gajian 5 juta"
-Output: {"type": "income", "amount": 5000000, "category": "salary", "description": "gajian"}`;
 
 // ============= MAIN HANDLER =============
 function doPost(e) {
@@ -121,6 +83,58 @@ function doPost(e) {
 // ============= GITHUB MODELS PARSING =============
 function parseWithGitHub(message) {
   try {
+    if (!GITHUB_TOKEN) {
+      Logger.log('ERROR: GITHUB_TOKEN tidak diset di PropertiesService');
+      return {
+        success: false,
+        error: 'Token GitHub tidak dikonfigurasi',
+      };
+    }
+
+    const SYSTEM_PROMPT = `Anda adalah assistant keuangan yang ahli dalam parsing transaksi finansial berbahasa Indonesia.
+
+TASK: Parse pesan user dan ekstrak informasi transaksi ke dalam format JSON.
+
+INSTRUKSI:
+1. Jika pesan adalah transaksi, extract ke JSON:
+{
+  "type": "expense" atau "income",
+  "amount": number (nominal dalam Rupiah, integer saja),
+  "category": "string" (pilih dari: food, transport, utilities, salary, transfer, shopping, entertainment, health, other),
+  "description": "string"
+}
+
+2. Jika bukan transaksi atau tidak jelas:
+{
+  "success": false,
+  "message": "Pesan bukan transaksi"
+}
+
+3. JANGAN tambah teks lain, hanya JSON!
+
+PARSING RULES:
+- "rb" atau "k" = ribu (1000)
+- "juta" = 1.000.000
+- Contoh: "7rb" = 7000, "2.5 juta" = 2500000
+
+KATEGORI:
+- food: makanan, minum, jajan
+- transport: gojek, bensin, parkir
+- utilities: listrik, air, internet, pulsa
+- salary: gajian, bonus, insentif
+- transfer: transfer uang, top up
+- shopping: belanja barang
+- entertainment: netflix, game, bioskop
+- health: dokter, obat
+- other: lainnya
+
+CONTOH:
+Input: "beli pentol 7000"
+Output: {"type": "expense", "amount": 7000, "category": "food", "description": "pentol"}
+
+Input: "gajian 5 juta"
+Output: {"type": "income", "amount": 5000000, "category": "salary", "description": "gajian"}`;
+
     const payload = {
       model: 'mistralai/mistral-7b-instruct',
       messages: [
@@ -147,8 +161,6 @@ function parseWithGitHub(message) {
       options
     );
 
-    const result = JSON.parse(response.getContentText());
-
     if (response.getResponseCode() !== 200) {
       Logger.log('GitHub API Error: ' + response.getContentText());
       return {
@@ -157,6 +169,7 @@ function parseWithGitHub(message) {
       };
     }
 
+    const result = JSON.parse(response.getContentText());
     const aiResponse = result.choices[0].message.content.trim();
 
     // Parse JSON dari response

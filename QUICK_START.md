@@ -10,7 +10,6 @@
 ```
 
 **Token:** `ghu_xxxxxxxxxxxx`
-
 ---
 
 ## 🟠 Step 2: Google Sheet (3 menit)

@@ -4,7 +4,7 @@
  */
 
 // Configuration
-const APPS_SCRIPT_URL = ''; // ANDA PERLU ISI INI dengan URL dari Google Apps Script
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkVzUBKbKwFcPXqBAsDLHqxmigfsPg-WNSaA3fxrU5R9S-JG25en2wrAoic0lBhzCp/exec'; // ANDA PERLU ISI INI dengan URL dari Google Apps Script
 
 // DOM Elements
 const chatBox = document.getElementById('chatBox');
