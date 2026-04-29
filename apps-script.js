@@ -46,8 +46,9 @@ function doPost(e) {
     if (!parsed.success) {
       return ContentService.createTextOutput(
         JSON.stringify({
-          success: true,
-          response: `❓ Maaf, saya tidak bisa memahami transaksi Anda. Coba format seperti:\n• "beli pentol 7000"\n• "gajian 5 juta"\n• "bayar listrik 200k"`,
+          success: false,
+          error: parsed.error ||
+            '❓ Maaf, saya tidak bisa memahami transaksi Anda. Coba format seperti: "beli pentol 7000", "gajian 5 juta", atau "bayar listrik 200k".',
         })
       ).setMimeType(ContentService.MimeType.JSON);
     }
